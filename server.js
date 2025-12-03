@@ -95,7 +95,7 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
         const startTime = Date.now();
 
         const response = await together.chat.completions.create({
-            model: 'meta-llama/Llama-Guard-4-12B',
+            model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
             messages: [
                 {
                     role: 'user',
