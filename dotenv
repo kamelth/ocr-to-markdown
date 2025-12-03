@@ -1,0 +1,4 @@
+PORT=3000
+AWS_REGION=us-east-1
+BUCKET_NAME=your-s3-bucket-name
+TOGETHER_API_KEY=your-together-ai-key

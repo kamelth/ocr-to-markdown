@@ -1,0 +1,25 @@
+{
+  "name": "ocr-to-markdown",
+  "version": "1.0.0",
+  "description": "OCR to Markdown converter using AWS EC2 + S3 + AI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "ocr",
+    "markdown",
+    "aws",
+    "ai"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.943.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.22.1",
+    "llama-ocr": "^0.0.6",
+    "multer": "^1.4.5-lts.1"
+  }
+}
