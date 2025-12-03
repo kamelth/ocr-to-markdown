@@ -8,10 +8,9 @@ require('dotenv').config();
 
 const express = require('express');
 const multer = require('multer');
-const { ocr } = require('llama-ocr');
+const Together = require('together-ai');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const fs = require('fs').promises;
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +24,11 @@ const upload = multer({
 // Initialize S3 client
 const s3Client = new S3Client({
     region: process.env.AWS_REGION || 'us-east-1'
+});
+
+// Initialize Together AI client
+const together = new Together({
+    apiKey: process.env.TOGETHER_API_KEY
 });
 
 // Middleware
@@ -76,24 +80,44 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
 
         console.log('📷 Processing image:', req.file.originalname, `(${req.file.size} bytes)`);
 
-        // Save image to temp file
-        const timestamp = Date.now();
-        const tempPath = `/tmp/${timestamp}-${req.file.originalname}`;
-        await fs.writeFile(tempPath, req.file.buffer);
-        console.log('💾 Saved to temp:', tempPath);
-
         // Upload to S3
+        const timestamp = Date.now();
         const s3Key = `uploads/${timestamp}-${req.file.originalname}`;
         await uploadToS3(bucketName, s3Key, req.file.buffer, req.file.mimetype);
         console.log('☁️  Uploaded to S3:', s3Key);
 
-        // Run OCR
-        console.log('🤖 Running OCR with Llama 3.2 Vision...');
+        // Convert image to base64
+        const base64Image = req.file.buffer.toString('base64');
+        const imageDataUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+        // Run OCR with Together AI Chat Completions API
+        console.log('🤖 Running OCR with Together AI Vision...');
         const startTime = Date.now();
-        const markdown = await ocr({
-            filePath: tempPath,
-            apiKey: apiKey
+
+        const response = await together.chat.completions.create({
+            model: 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo',
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Extract all text from this image and format it as clean markdown. Include headings, lists, tables, and any structure visible in the image. Only return the markdown content, no explanations.'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: imageDataUrl
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens: 4096,
+            temperature: 0.1
         });
+
+        const markdown = response.choices[0]?.message?.content || 'No text extracted';
         const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
         console.log(`✅ OCR completed in ${processingTime}s, markdown length: ${markdown.length}`);
 
@@ -101,9 +125,6 @@ app.post('/api/ocr', upload.single('image'), async (req, res) => {
         const mdKey = s3Key.replace(/\.[^.]+$/, '.md');
         await uploadToS3(bucketName, mdKey, markdown, 'text/markdown');
         console.log('📝 Saved markdown to S3:', mdKey);
-
-        // Clean up temp file
-        await fs.unlink(tempPath).catch(() => {});
 
         // Return result
         res.json({
